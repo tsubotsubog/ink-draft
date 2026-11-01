@@ -220,7 +220,7 @@
   .pick.mine { border-color: var(--hov); box-shadow: 0 0 0 2px var(--hov) }
   .nb { display: inline-flex; gap: 3px; margin-left: auto }
   .nb i { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--bg) }
-  .clock.lot { background: var(--surface-2); color: var(--fg); border: 1px solid var(--accent) }
+  .clock.alt { background: var(--surface-2); color: var(--fg); border: 1px solid var(--accent) }
   .lots { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px }
   .lot { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 12px; align-content: start }
   .lot-p { display: flex; gap: 12px; align-items: center }
@@ -970,9 +970,9 @@ function renderSimul() {
 
   let banner;
   if (done) banner = `<div class="clock" style="background:var(--accent);color:var(--accent-ink)"><div class="who"><small>DRAFT COMPLETE</small><strong>ドラフト完了</strong></div><div class="count">${S.picks.length}<small>人を指名</small></div></div>`;
-  else if (S.stage === "announce") banner = `<div class="clock lot"><div class="who"><small>${esc(stageName)} ・ 発表</small><strong>選択希望選手の発表</strong></div><div class="count">${S.annIdx}<small>/ ${S.annOrder.length} チーム発表</small></div></div>`;
-  else if (S.stage === "lottery") banner = `<div class="clock lot"><div class="who"><small>第${S.round}巡 ・ 抽選</small><strong>${S.lotteries.length}人の指名が重なりました</strong></div><div class="count">${S.lotteries.filter(l => l.winner != null).length}<small>/ ${S.lotteries.length} 件決定</small></div></div>`;
-  else if (AUD) banner = `<div class="clock lot"><div class="who"><small>${esc(stageName)}</small><strong>指名受付中</strong></div><div class="count">${nominated}<small>/ ${pend.length} チーム指名済み</small></div></div>`;
+  else if (S.stage === "announce") banner = `<div class="clock alt"><div class="who"><small>${esc(stageName)} ・ 発表</small><strong>選択希望選手の発表</strong></div><div class="count">${S.annIdx}<small>/ ${S.annOrder.length} チーム発表</small></div></div>`;
+  else if (S.stage === "lottery") banner = `<div class="clock alt"><div class="who"><small>第${S.round}巡 ・ 抽選</small><strong>${S.lotteries.length}人の指名が重なりました</strong></div><div class="count">${S.lotteries.filter(l => l.winner != null).length}<small>/ ${S.lotteries.length} 件決定</small></div></div>`;
+  else if (AUD) banner = `<div class="clock alt"><div class="who"><small>${esc(stageName)}</small><strong>指名受付中</strong></div><div class="count">${nominated}<small>/ ${pend.length} チーム指名済み</small></div></div>`;
   else {
     const at = S.active >= 0 ? S.teams[S.active] : null, c = at ? COLORS[at.color] : null;
     banner = `<div class="clock" style="background:${c ? c.bg : "var(--surface-2)"};color:${c ? c.fg : "var(--fg)"}"><div class="who"><small>${esc(stageName)} ・ 入力中</small><strong>${at ? esc(at.name) + "（" + esc(at.captain.name) + "）" : "チームを選んでください"}</strong></div><div class="count">${nominated}<small>/ ${pend.length} チーム指名済み</small></div></div>`;
