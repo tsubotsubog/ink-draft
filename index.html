@@ -379,6 +379,32 @@
   body.drafting .clock { justify-content: flex-start; align-items: flex-end; column-gap: 20px }
   body.drafting .clock .count { font-size: clamp(18px, 2vw, 24px); line-height: 1.2 }
   body.drafting .clock .count small { font-size: 13px; margin-left: 4px }
+
+  /* ===== 追加：勝利ボーナス点（エリア・アサリ・ランダム） ===== */
+  .pts { display: inline-flex; gap: 4px; flex-wrap: nowrap; align-items: center }
+  .pt { display: inline-flex; align-items: center; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px 1px 2px; font-size: 12.5px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.4 }
+  .pt img { width: 20px; height: 20px; object-fit: contain }
+  .pt.na { color: var(--fg-3); font-weight: 700 }
+  .pts .sum { font-size: 11px; font-weight: 700; color: var(--fg-3); margin-left: 2px; white-space: nowrap }
+  .pts .sum.bad { color: var(--down) }
+  .pick .pts .pt { background: var(--surface-2) }
+  .prow .ppts { min-width: 0 }
+  .tpts { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; padding: 6px 12px 0; font-size: 11px; font-weight: 700; color: var(--fg-3) }
+  .tpts .lab { letter-spacing: .06em; margin-right: 2px }
+  .tpts { flex-wrap: nowrap; gap: 4px }
+  .tpts .pt { background: var(--bg); font-size: 12.5px; padding: 1px 6px 1px 1px }
+  .tpts .pt img { width: 18px; height: 18px }
+  .tpts .pt.top { border-color: var(--accent); color: var(--accent) }
+  .ann-p .pts, .lot-p .pts { margin-top: 4px }
+  body.drafting .tpts { padding: 4px 12px 0 }
+  body.drafting .tpts .pt { font-size: 12px }
+  body.drafting .tpts .pt img { width: 18px; height: 18px }
+  .prow { grid-template-columns: 34px minmax(140px, 1.1fr) minmax(0, 2.4fr) 200px minmax(0, 1.8fr) }
+  @media (max-width: 760px) {
+    .prow { grid-template-columns: 26px minmax(0, 1fr) }
+    .prow .ppts { grid-column: 2 }
+  }
+
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
@@ -406,7 +432,7 @@
 <footer>
   <div class="wrap">
     <span id="footStatus"></span>
-    <span>出場選手は「ドラフト出場選手データ」スプレッドシートから読み込みます。ドラフトの途中経過は、開いているブラウザにだけ保存されます。</span>
+    <span>出場選手（使用武器・勝利ボーナス点の割り振り・自己PR）は「ドラフト出場選手データ」スプレッドシートから読み込みます。チーム表の「ボーナス点」は、メンバーの割り振りの合計（そのルールで勝ったときに加算される点）です。ドラフトの途中経過は、開いているブラウザにだけ保存されます。</span>
     <span>本ページはファンによる非公式のツールです。ゲーム内の名称・画像の権利はそれぞれの権利者に帰属します。</span>
   </div>
 </footer>
@@ -455,7 +481,11 @@ const SAMPLE_ROSTER = [
   { name: "アジ", weapons: ["ノヴァブラスター", "ホットブラスター"], pr: "ホコ持ちも任せてください！" },
   { name: "タイ", weapons: ["ジムワイパー", "ドライブワイパー"], pr: "前に出て一気に人数を取ります。" },
   { name: "ヒラメ", weapons: ["パラシェルター", "キャンピングシェルター"], pr: "味方を守るのが好きです。アサリ運びも練習中。" }
-].map((p, i) => ({ id: "s" + i, icon: "", ...p }));
+].map((p, i) => {
+  // サンプルの勝利ボーナス点（エリア・アサリ・ランダム）
+  const [area, asari, random] = [[10, 10, 10], [20, 10, 0], [8, 8, 14], [3, 15, 12], [15, 5, 10], [0, 30, 0], [12, 12, 6], [5, 20, 5]][i] || [10, 10, 10];
+  return { id: "s" + i, icon: "", pts: { area, asari, random }, ...p };
+});
 
 let S = load() || {
   phase: "setup", teamCount: 2, teamSize: 4, mode: "simul", shuffle: false,
@@ -479,8 +509,16 @@ function normalize(list) {
     name: String(p.name || "").trim(),
     icon: safeSrc(p.icon),
     weapons: (p.weapons || []).map(w => String(w).trim()).filter(Boolean).slice(0, 3),
+    pts: normPts(p.pts),
     pr: String(p.pr || "").trim()
   })).filter(p => p.name);
+}
+/* 勝利ボーナス点：0〜30 の数字（空欄は null） */
+function normPts(o) {
+  if (!o) return null;
+  const f = v => { if (v === "" || v == null) return null; const n = Number(String(v).replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))); return isFinite(n) ? Math.round(n) : null };
+  const r = { area: f(o.area), asari: f(o.asari), random: f(o.random) };
+  return r.area == null && r.asari == null && r.random == null ? null : r;
 }
 function readCache() { try { return JSON.parse(localStorage.getItem(ROSTER_KEY) || "null") } catch (e) { return null } }
 function writeCache(players, at) { try { localStorage.setItem(ROSTER_KEY, JSON.stringify({ players, at })) } catch (e) { } }
@@ -573,6 +611,37 @@ function weaponMini(p) {
   }).join("")}</span>`;
 }
 
+/* ---------- 勝利ボーナス点（各選手の持ち点30点をエリア・アサリ・ランダムに割り振ったもの） ---------- */
+const PT_RULES = [
+  { k: "area", n: "エリア", img: "data:image/webp;base64,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" },
+  { k: "asari", n: "アサリ", img: "data:image/webp;base64,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" },
+  { k: "random", n: "ランダム", img: "data:image/webp;base64,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" }
+];
+const PT_TOTAL = 30;
+const hasPts = p => !!(p && p.pts && PT_RULES.some(r => p.pts[r.k] != null));
+const ptSum = p => PT_RULES.reduce((a, r) => a + (Number(p.pts && p.pts[r.k]) || 0), 0);
+/* 選手1人分：3ルールの点数。withSum=true のとき、合計が30点でなければ注意を出す（運営用の確認） */
+function ptsMini(p, withSum) {
+  if (!hasPts(p)) return withSum ? '<span class="wnone">未入力</span>' : "";
+  const sum = ptSum(p);
+  return `<span class="pts" title="勝利ボーナス点の割り振り（${PT_RULES.map(r => r.n + " " + (p.pts[r.k] ?? "-")).join("・")}）">${PT_RULES.map(r =>
+    `<span class="pt ${p.pts[r.k] == null ? "na" : ""}"><img src="${r.img}" alt="${r.n}">${p.pts[r.k] ?? "-"}</span>`).join("")}${withSum && sum !== PT_TOTAL ? `<span class="sum bad">合計${sum}点</span>` : ""}</span>`;
+}
+/* チーム合計：そのルールで勝ったときの勝利ボーナス点 */
+function teamPts(members) {
+  const list = members.filter(Boolean);
+  if (!list.some(hasPts)) return "";
+  const tot = PT_RULES.map(r => list.reduce((a, m) => a + (Number(m.pts && m.pts[r.k]) || 0), 0));
+  const mx = Math.max(...tot);
+  return `<div class="tpts" title="このチームが各ルールで勝ったときの勝利ボーナス点（メンバーの合計）"><span class="lab">ボーナス点</span>${PT_RULES.map((r, i) =>
+    `<span class="pt ${tot[i] === mx && mx > 0 ? "top" : ""}"><img src="${r.img}" alt="${r.n}">${tot[i]}</span>`).join("")}</div>`;
+}
+function teamPtsText(members) {
+  const list = members.filter(Boolean);
+  if (!list.some(hasPts)) return "";
+  return "勝利ボーナス点：" + PT_RULES.map(r => r.n + list.reduce((a, m) => a + (Number(m.pts && m.pts[r.k]) || 0), 0) + "点").join("／");
+}
+
 /* ---------- 指名順 ---------- */
 function totalPicks() { return Math.min(S.teams.length * (S.teamSize - 1), S.pool.length) }
 function teamAt(k) { const n = S.teams.length, r = Math.floor(k / n), p = k % n; return S.mode === "snake" && r % 2 === 1 ? n - 1 - p : p }
@@ -609,12 +678,13 @@ function renderSetup() {
         <p class="hint">「名前 / 武器1 / 武器2 / 武器3」の形で書くと、武器の画像も表示されます。キャプテンも含めて入れてください。</p></div>`
     : (players.length
       ? `<div class="plist" role="table" aria-label="出場選手">
-          <div class="prow phd" role="row"><span role="columnheader">No.</span><span role="columnheader">選手</span><span role="columnheader">使用武器</span><span role="columnheader">自己PR</span></div>
+          <div class="prow phd" role="row"><span role="columnheader">No.</span><span role="columnheader">選手</span><span role="columnheader">使用武器</span><span role="columnheader">勝利ボーナス点</span><span role="columnheader">自己PR</span></div>
           ${players.map((p, i) => `
           <div class="prow ${caps.has(p.name) ? "cap" : ""}" role="row" data-name="${esc(p.name)}">
             <span class="pno" role="cell">${i + 1}</span>
             <span class="pwho" role="cell">${avatar(p, "m")}<span class="pn">${caps.has(p.name) ? "<small>CAPTAIN</small>" : ""}${esc(p.name)}</span></span>
             <span class="pweap" role="cell">${weaponChips(p)}</span>
+            <span class="ppts" role="cell">${ptsMini(p, true)}</span>
             <span class="ppr" role="cell">${p.pr ? esc(p.pr) : '<span class="wnone">—</span>'}</span>
           </div>`).join("")}
         </div>`
@@ -745,6 +815,7 @@ function renderDraft() {
         <button class="pick card2" data-pick="${p.id}" ${done ? "disabled" : ""} style="--hov:${ct ? ct.bg : "var(--accent)"}">
           <span class="top">${avatar(p, "m")}<b>${esc(p.name)}</b></span>
           ${weaponMini(p)}
+          ${ptsMini(p)}
           ${p.pr ? `<span class="pr clamp">${esc(p.pr)}</span>` : ""}
         </button>`).join("")}</div>`
     : '<p class="hint">全員が指名されました。</p>';
@@ -759,7 +830,7 @@ function renderDraft() {
     for (let j = mem.length + 1; j < S.teamSize; j++) rows += `<li class="empty"><span class="av s">—</span><span class="nm">未指名</span></li>`;
     return `<div class="team ${i === cur ? "on" : ""}" style="--tc:${c.bg}">
       <h3 style="background:${c.bg};color:${c.fg}">${esc(t.name)}<small>${mem.length + 1}/${S.teamSize}</small></h3>
-      <ol>${rows}</ol></div>`;
+      ${teamPts([t.captain, ...mem])}<ol>${rows}</ol></div>`;
   }).join("");
 
   const resultBlock = done ? `
@@ -812,7 +883,8 @@ function resultText() {
   const lines = S.teams.map((t, i) => {
     const m = S.picks.filter(pk => pk.team === i).map(pk => { const p = S.pool.find(x => x.id === pk.player);
       return `・${p.name}${wtxt(p)}${pk.lottery ? "　※抽選" : ""}` });
-    return `【${t.name}】\n・${t.captain.name}［キャプテン］${wtxt(t.captain)}${m.length ? "\n" + m.join("\n") : ""}`;
+    const ptxt = teamPtsText([t.captain, ...S.picks.filter(pk => pk.team === i).map(pk => S.pool.find(x => x.id === pk.player))]);
+    return `【${t.name}】\n・${t.captain.name}［キャプテン］${wtxt(t.captain)}${m.length ? "\n" + m.join("\n") : ""}${ptxt ? "\n" + ptxt : ""}`;
   });
   const rest = available();
   if (rest.length) lines.push(`【控え】\n${rest.map(p => "・" + p.name).join("\n")}`);
@@ -1010,7 +1082,7 @@ function renderSimul() {
       return `<div class="ann-card ${st} ${k === S.annIdx ? "next" : ""}" style="--tc:${c.bg};--tf:${c.fg}">
         <div class="ann-team">${esc(t.name)}<small>${esc(t.captain.name)}</small></div>
         <div class="ann-stage">
-          <div class="ann-p">${p ? `${avatar(p, "l")}<div><b>${esc(p.name)}</b>${weaponMini(p)}</div>${cnt[p.id] > 1 ? `<span class="dup ${late ? "late" : ""}">重複</span>` : ""}` : '<span class="ann-hidden">？</span>'}</div>
+          <div class="ann-p">${p ? `${avatar(p, "l")}<div><b>${esc(p.name)}</b>${weaponMini(p)}${ptsMini(p)}</div>${cnt[p.id] > 1 ? `<span class="dup ${late ? "late" : ""}">重複</span>` : ""}` : '<span class="ann-hidden">？</span>'}</div>
           <div class="curtain l" aria-hidden="true"></div><div class="curtain r" aria-hidden="true"></div>
           ${!open ? `<span class="ann-label">${k === S.annIdx ? "まもなく公開" : "指名済み"}</span>` : ""}
         </div></div>`;
@@ -1037,7 +1109,7 @@ function renderSimul() {
         const p = S.pool.find(x => x.id === l.player);
         const wt = l.winner != null ? S.teams[l.winner] : null;
         const spinning = l.spinAt && l.winner == null;
-        return `<div class="lot"><div class="lot-p">${avatar(p, "l")}<div><b>${esc(p.name)}</b>${weaponMini(p)}</div></div>
+        return `<div class="lot"><div class="lot-p">${avatar(p, "l")}<div><b>${esc(p.name)}</b>${weaponMini(p)}${ptsMini(p)}</div></div>
           <p class="h4">${l.teams.length}チームが重複</p>
           ${slotHTML(l, li)}
           ${wt ? `<p class="lot-win" style="--tc:${COLORS[wt.color].bg};--tf:${COLORS[wt.color].fg}"><span>${esc(wt.name)}</span>が交渉権を獲得</p>`
@@ -1051,7 +1123,7 @@ function renderSimul() {
   const poolHtml = avail.length ? `<div class="pool cards">${avail.map(p => {
       const by = nomCount[p.id] || [];
       const inner = `${avatar(p, "m")}<span class="pbody"><span class="pname"><b>${esc(p.name)}</b>${by.length ? `<span class="nb">${by.map(i => `<i style="background:${COLORS[S.teams[i].color].bg}" title="${esc(S.teams[i].name)}"></i>`).join("")}</span>` : ""}</span>
-        ${weaponMini(p)}${p.pr ? `<span class="pr one" title="${esc(p.pr)}">${esc(p.pr)}</span>` : ""}</span>`;
+        ${weaponMini(p)}${ptsMini(p)}${p.pr ? `<span class="pr one" title="${esc(p.pr)}">${esc(p.pr)}</span>` : ""}</span>`;
       return AUD ? `<div class="pick card2 v2 view">${inner}</div>`
         : `<button class="pick card2 v2 ${S.active >= 0 && S.noms[S.active] === p.id ? "mine" : ""}" data-nom="${p.id}" ${done || S.stage !== "nominate" ? "disabled" : ""} style="--hov:${at ? at.bg : "var(--accent)"}">${inner}</button>`;
     }).join("")}</div>` : '<p class="hint">全員が指名されました。</p>';
@@ -1064,7 +1136,7 @@ function renderSimul() {
     for (let j = mem.length + 1; j < S.teamSize; j++) rows += `<li class="empty"><span class="av s">—</span><span class="nm">未指名</span></li>`;
     const sel = !AUD && !done && S.stage === "nominate" && pend.includes(i);
     return `<div class="team ${i === S.active && sel ? "on" : ""} ${sel ? "selectable" : ""}" ${sel ? `data-active="${i}" role="button" tabindex="0"` : ""} style="--tc:${c.bg}">
-      <h3 style="background:${c.bg};color:${c.fg}">${esc(t.name)}<small>${mem.length + 1}/${S.teamSize}</small></h3><ol>${rows}</ol></div>`;
+      <h3 style="background:${c.bg};color:${c.fg}">${esc(t.name)}<small>${mem.length + 1}/${S.teamSize}</small></h3>${teamPts([t.captain, ...mem.map(pk => S.pool.find(x => x.id === pk.player))])}<ol>${rows}</ol></div>`;
   }).join("");
 
   const resultBlock = done ? `<section class="panel" style="margin-top:24px"><div class="panel-head"><h2>結果</h2>
@@ -1118,11 +1190,12 @@ function renderAudienceSetup() {
     <section class="panel"><div class="panel-head"><h2>チームとキャプテン</h2></div><div class="nomrow" style="margin:0">${teams}</div></section>
     <section class="panel" style="margin-top:24px"><div class="panel-head"><h2>出場選手</h2></div>
       ${players.length ? `<div class="plist" role="table" aria-label="出場選手">
-        <div class="prow phd" role="row"><span role="columnheader">No.</span><span role="columnheader">選手</span><span role="columnheader">使用武器</span><span role="columnheader">自己PR</span></div>
+        <div class="prow phd" role="row"><span role="columnheader">No.</span><span role="columnheader">選手</span><span role="columnheader">使用武器</span><span role="columnheader">勝利ボーナス点</span><span role="columnheader">自己PR</span></div>
         ${players.map((p, i) => `<div class="prow ${caps.has(p.name) ? "cap" : ""}" role="row">
           <span class="pno" role="cell">${i + 1}</span>
           <span class="pwho" role="cell">${avatar(p, "m")}<span class="pn">${caps.has(p.name) ? "<small>CAPTAIN</small>" : ""}${esc(p.name)}</span></span>
           <span class="pweap" role="cell">${weaponChips(p)}</span>
+          <span class="ppts" role="cell">${ptsMini(p, false)}</span>
           <span class="ppr" role="cell">${p.pr ? esc(p.pr) : '<span class="wnone">—</span>'}</span></div>`).join("")}</div>`
       : '<p class="hint">出場選手を読み込んでいます…</p>'}
     </section>`;
@@ -1171,6 +1244,7 @@ if (AUD) {
 render();
 loadRoster();
 </script>
+
 
 </body>
 </html>
