@@ -501,6 +501,19 @@
   }
 
 
+
+  /* 試合結果 */
+  .mr .th { display: block }
+  .mr .th .tchip { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 800; font-size: 26px; border-radius: inherit }
+  .mr.top .th .tchip { font-size: 44px }
+  .mr .sub { font-size: 12px; font-weight: 700; color: var(--fg-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+  .mr .sub .dot { margin: 0 4px; opacity: .6 }
+  .mr.top .sub { font-size: 14px }
+  .mr:not(.open) .sub, .mr.shuffling .sub { visibility: hidden }
+  .mr.top + .mr.top { margin-bottom: 14px }
+  .sr.top[data-medal="2"].open.done { box-shadow: 0 0 0 2px var(--silver, #c9d3e2), 0 10px 40px -14px rgba(120,130,150,.6); border-color: var(--silver, #c9d3e2) }
+  .linkbtn { font: inherit; font-weight: 800; color: var(--accent); background: none; border: 0; padding: 0 0 0 6px; cursor: pointer; text-decoration: underline }
+  @media (max-width: 640px) { .mr .th .tchip { font-size: 20px } .mr.top .th .tchip { font-size: 30px } .mr .sub { font-size: 11px; white-space: normal } }
   .sctrl { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; max-width: 960px; margin: 0 auto 8px }
   .sctrl .seg { display: flex; gap: 8px; flex-wrap: wrap }
   .sboard { padding-bottom: 12px }
@@ -601,7 +614,7 @@
 <header class="site-head">
   <div class="wrap">
     <a class="brand" href="#top"><small>TEAM DRAFT</small><b>.inkドラフト甲子園</b></a>
-    <div class="tabs" role="tablist" aria-label="進行状況"><button id="ph-stage">ステージ</button><button id="ph-setup">準備</button><button id="ph-draft">ドラフト</button><button id="ph-done">結果</button></div>
+    <div class="tabs" role="tablist" aria-label="進行状況"><button id="ph-stage">ステージ</button><button id="ph-setup">準備</button><button id="ph-draft">ドラフト</button><button id="ph-done">結果</button><button id="ph-match">試合結果</button></div>
     <div class="head-actions" id="headActions"></div>
   </div>
 </header>
@@ -733,6 +746,7 @@ async function loadRoster() {
   if (!onAppsScript() && !API_URL) {
     roster = SAMPLE_ROSTER;
     rosterState = { kind: "sample", msg: "API_URL が未設定のため、サンプル選手を表示しています。" };
+    standings = sampleStandings(); standingsMsg = "";
     return render();
   }
   const cache = readCache();
@@ -743,6 +757,10 @@ async function loadRoster() {
     const body = await fetchPlayers();
     if (!body || !Array.isArray(body.players)) throw new Error("形式が違います");
     roster = normalize(body.players);
+    standings = cleanStandings(body.standings);
+    standingsMsg = body.standings === undefined
+      ? "スプレッドシート側のプログラム（Code.gs）が古いため、試合結果を読み込めません。新しい Code.gs を貼り付けて「新バージョン」でデプロイし直してください。"
+      : standings && standings.length ? "" : "「試合結果」シートに順位表が見つからないか、チームがまだ入っていません。";
     rosterState = { kind: "live", msg: `スプレッドシートから ${roster.length} 人を読み込みました。`, at: body.updatedAt || new Date().toISOString() };
     writeCache(roster, rosterState.at);
   } catch (e) {
@@ -841,7 +859,7 @@ function teamAt(k) { const n = S.teams.length, r = Math.floor(k / n), p = k % n;
 function membersOf(ti) { return S.picks.filter(p => p.team === ti).map(p => S.pool.find(x => x.id === p.player)) }
 function available() { const t = new Set(S.picks.map(p => p.player)); return S.pool.filter(p => !t.has(p.id)) }
 function isDone() { return S.picks.length >= totalPicks() }
-function setPhase(ph) { ["stage", "setup", "draft", "done"].forEach(k => { const el = $("ph-" + k); el.className = k === ph ? "on" : ""; el.setAttribute("aria-selected", k === ph) }) }
+function setPhase(ph) { ["stage", "setup", "draft", "done", "match"].forEach(k => { const el = $("ph-" + k); el.className = k === ph ? "on" : ""; el.setAttribute("aria-selected", k === ph) }) }
 function setFacts(items) { $("facts").innerHTML = items.map(([n, l]) => `<div class="fact"><span class="n">${n}</span><span class="l">${l}</span></div>`).join("") }
 function ensureTeams() {
   while (S.setupTeams.length < S.teamCount) {
@@ -1784,12 +1802,179 @@ function stSplat(row) {
   requestAnimationFrame(loop);
 }
 
+/* ===== 試合結果：「試合結果」シートの順位表を、下位から発表する（1位と2位は同時） ===== */
+let standings = null;                       // 最後に読み込んだ順位表（null＝まだ無い）
+let standingsMsg = "";
+
+function sampleStandings() {
+  const names = (S.teams && S.teams.length ? S.teams.map(t => t.name) : ["チームA", "チームB", "チームC", "チームD"]);
+  const pts = [412, 388, 301, 265, 240, 199, 170, 150];
+  return names.map((team, i) => ({ rank: i + 1, team, games: names.length - 1, win: Math.max(0, names.length - 1 - i), lose: i, ruleWins: 6 - i, total: pts[i] || 100 - i, members: [] }));
+}
+function cleanStandings(list) {
+  if (!Array.isArray(list)) return null;
+  return list.filter(x => x && String(x.team || "").trim()).map(x => ({
+    rank: +x.rank || 0, team: String(x.team).trim(), games: +x.games || 0, win: +x.win || 0, lose: +x.lose || 0,
+    ruleWins: +x.ruleWins || 0, total: +x.total || 0, members: Array.isArray(x.members) ? x.members.map(String) : []
+  })).sort((a, b) => (a.rank || 99) - (b.rank || 99) || b.total - a.total);
+}
+
+/* 発表前は最新の順位表に合わせる。1つでも開いたら固定する */
+function mrData() {
+  if (!S.mres) S.mres = { shown: 0, at: 0, top: [] };
+  const m = S.mres;
+  const src = rosterState.kind === "sample" ? sampleStandings() : standings;
+  if (!AUD && !m.shown && src) {
+    const next = src.map(x => ({ ...x, tie: src.filter(y => y.rank === x.rank).length > 1 }));
+    if (JSON.stringify(next) !== JSON.stringify(m.top)) { m.top = next; save() }
+  }
+  m.top = m.top || [];
+  return m;
+}
+function mrSteps(n) { return n >= 2 ? n - 1 : n }                 // 1位と2位で1回
+function mrLatest(m) { const n = m.top.length; if (!m.shown) return -1; return m.shown >= mrSteps(n) ? 0 : n - m.shown }
+function mrFirstOpen(m) { const n = m.top.length, s = Math.min(m.shown || 0, mrSteps(n)); return !s ? n : s >= mrSteps(n) ? 0 : n - s }
+function mrDur(pos) { return pos === 0 ? ST_DUR1 : ST_DUR }
+function mrBusy(m) { const p = mrLatest(m); return p >= 0 && stElapsed(m) < mrDur(p) }
+
+function mrColor(name) {
+  const t = (S.teams || []).find(t => t.name === name);
+  if (t && COLORS[t.color]) return COLORS[t.color];
+  const names = ((S.mres && S.mres.top) || []).map(x => x.team).sort((a, b) => a.localeCompare(b, "ja"));
+  const i = names.indexOf(name);
+  return i >= 0 ? COLORS[i % COLORS.length] : { bg: "var(--sumi)", fg: "#fff" };
+}
+function mrChip(name) {
+  const c = mrColor(name);
+  return `<span class="tchip" style="background:${c.bg};color:${c.fg}">${esc([...(name.replace(/^チーム\s*/, "") || name)][0] || "?")}</span>`;
+}
+function mrSub(x) {
+  return `${x.win}勝${x.lose}敗<span class="dot">・</span>ルール${x.ruleWins}勝${x.members.length ? `<span class="dot">・</span>${x.members.map(esc).join(" / ")}` : ""}`;
+}
+function mrSetReal(row, x) {
+  row.querySelector(".th").innerHTML = mrChip(x.team);
+  row.querySelector(".nm").innerHTML = (x.tie ? `<span class="tie">同率${x.rank}位</span>` : "") + esc(x.team);
+  row.querySelector(".rk").innerHTML = `${x.rank}<small>位</small>`;
+}
+function mrRowHTML(x, pos, open, maxv, big) {
+  const w = Math.round(x.total / maxv * 100);
+  return `<div class="sr mr ${big ? "top" : ""} ${open ? "open done curdone" : ""}" data-pos="${pos}" data-medal="${x.rank <= 3 ? x.rank : ""}">
+    <span class="rk">${open ? x.rank : pos + 1}<small>位</small></span>
+    <span class="th">${open ? mrChip(x.team) : ""}</span>
+    <span class="main"><span class="nm">${open ? (x.tie ? `<span class="tie">同率${x.rank}位</span>` : "") + esc(x.team) : "？？？"}</span>
+      <span class="sub">${mrSub(x)}</span>
+      <span class="bar"><i data-w="${w}" style="${open ? `width:${w}%;transition:none` : ""}"></i></span></span>
+    <span class="votes"><span class="num" data-to="${x.total}">${x.total}</span><small>点</small></span>
+    ${big ? '<span class="scur" aria-hidden="true"><span class="scurtain l"></span><span class="scurtain r"></span></span>' : ""}
+  </div>`;
+}
+
+function renderMatch() {
+  setPhase("match");
+  const m = mrData(), top = m.top, n = top.length, steps = mrSteps(n);
+  const shown = Math.min(m.shown || 0, steps), first = mrFirstOpen(m), busy = mrBusy(m);
+  const nextFinal = n && shown === steps - 1, done = n && shown >= steps;
+  const nextPos = done ? -1 : nextFinal ? 0 : n - 1 - shown;
+  $("headActions").innerHTML = AUD ? "" : `
+    <button class="more sm" id="mrBack" ${shown && !busy ? "" : "disabled"}>ひとつ戻す</button>
+    <button class="more sm" id="mrAll" ${!done && !busy && n ? "" : "disabled"}>すべて表示</button>
+    <button class="more sm" id="mrReset" ${shown && !busy ? "" : "disabled"}>最初から</button>`;
+  $("heroEyebrow").textContent = "MATCH RESULTS";
+  $("heroTitle").innerHTML = `試合結果 <em>最終順位</em>`;
+  $("heroSub").textContent = "総当たりの合計得点で順位を決めました。下位から発表し、1位と2位は同時に発表します。";
+  const games = Math.round(top.reduce((a, x) => a + x.games, 0) / 2);
+  setFacts([[n, "チーム"], [games, "試合"], [`${shown} / ${steps}`, "発表済み"]]);
+
+  if (!n) {
+    $("app").innerHTML = `<section class="panel"><div class="panel-head"><h2>試合結果</h2></div>
+      ${AUD ? '<p class="lead">まもなく、試合結果を発表します。</p>'
+        : `<p class="note">${esc(standingsMsg || "試合結果がまだ読み込まれていません。")}</p>
+           <div class="sctrl"><span></span><button class="more primary" id="mrReload">スプレッドシートから読み込む</button></div>`}
+    </section>`;
+    if ($("mrReload")) $("mrReload").onclick = loadRoster;
+    return;
+  }
+
+  const maxv = Math.max(...top.map(x => x.total), 1);
+  const rows = top.map((x, pos) => mrRowHTML(x, pos, pos >= first, maxv, n >= 2 && pos <= 1)).join("");
+  const label = done ? "発表終了" : busy ? "発表中…" : nextFinal ? (n >= 2 ? "1位・2位を発表" : "1位を発表") : `${top[nextPos].rank}位を発表`;
+  $("app").innerHTML = `${AUD ? "" : `<div class="sctrl">
+      <span class="hint">${done ? "すべて発表しました。" : shown ? "スペースキー・→ でも次へ進めます。" : `発表前はシートの最新の順位を表示に使います。<button class="linkbtn" id="mrReload">いま読み込み直す</button>`}</span>
+      <span class="seg"><button class="more primary" id="mrNext" ${done || busy ? "disabled" : ""}>${label}</button></span></div>`}
+    <section class="sboard mrboard" aria-label="試合結果の順位">${rows}</section>`;
+  if (!busy && nextPos >= 0) {
+    $("app").querySelectorAll(nextFinal ? '.sr[data-pos="0"], .sr[data-pos="1"]' : `.sr[data-pos="${nextPos}"]`).forEach(r => r.classList.add("next"));
+  }
+  if (!AUD) {
+    $("mrNext").onclick = matchNext;
+    if ($("mrReload")) $("mrReload").onclick = loadRoster;
+    $("mrBack").onclick = () => { if (mrBusy(S.mres) || !S.mres.shown) return; S.mres.shown--; S.mres.at = 0; save(); render() };
+    $("mrAll").onclick = () => { if (mrBusy(S.mres)) return; S.mres.shown = mrSteps(S.mres.top.length); S.mres.at = 0; save(); render() };
+    $("mrReset").onclick = () => { if (mrBusy(S.mres)) return; S.mres.shown = 0; S.mres.at = 0; save(); render() };
+  }
+  if (busy) mrAnimate(m, mrLatest(m));
+}
+function matchNext() {
+  const m = S.mres; if (!m || mrBusy(m) || m.shown >= mrSteps(m.top.length)) return;
+  m.shown++; m.at = Date.now(); save(); render();
+}
+
+/* 開いた行の演出（途中で描き直しても経過時間から続ける） */
+function mrAnimate(m, pos) {
+  const gen = stGen, e = stElapsed(m);
+  const later = (ms, fn) => setTimeout(() => { if (gen === stGen) fn() }, Math.max(0, ms));
+  const list = pos === 0 ? [0, 1].filter(p => p < m.top.length) : [pos];
+  later(mrDur(pos) - e + 60, render);
+  const names = m.top.map(x => x.team);
+  list.forEach(p => {
+    const row = $("app").querySelector(`.sr[data-pos="${p}"]`); if (!row) return;
+    const x = m.top[p];
+    row.classList.remove("open", "done", "curdone");
+    row.querySelector(".nm").textContent = "？？？";
+    row.querySelector(".th").innerHTML = "";
+    const bar = row.querySelector(".bar i"); bar.style.transition = ""; bar.style.width = "0";
+    const land = () => { mrSetReal(row, x); row.classList.remove("shuffling"); row.classList.add("land", "just"); stCount(row, 100) };
+    if (pos !== 0) {
+      row.classList.add("open"); row.style.setProperty("--d", `-${Math.min(e, 600)}ms`);
+      mrShuffle(row, x, names, ST_SHUF, e, land, gen);
+      return;
+    }
+    /* 1位・2位：溜め → 幕 → 切り替え → 1位にインク */
+    const big = row.classList.contains("top");
+    const openTop = o => {
+      row.classList.remove("suspense"); row.classList.add("open");
+      row.style.setProperty("--d", `-${o}ms`);
+      if (!big || o >= 1700) row.classList.add("curdone"); else later(1700 - o, () => row.classList.add("curdone"));
+      mrShuffle(row, x, names, ST_SHUF1 + (p ? -250 : 0), o, () => { land(); row.classList.add("done"); if (x.rank === 1) stSplat(row) }, gen);
+    };
+    if (e < ST_SUSP) { row.classList.add("suspense"); later(ST_SUSP - e, () => openTop(0)) }
+    else openTop(e - ST_SUSP);
+  });
+}
+function mrShuffle(row, x, names, dur, from, done, gen) {
+  if (from >= dur || names.length < 2 || matchMedia("(prefers-reduced-motion: reduce)").matches) { done(); return }
+  const th = row.querySelector(".th"), nm = row.querySelector(".nm");
+  row.classList.add("shuffling");
+  let t = from, last = "";
+  const tick = () => {
+    if (gen !== stGen) return;
+    if (t >= dur) { done(); return }
+    let n, guard = 0;
+    do { n = names[Math.floor(Math.random() * names.length)] } while ((n === last || n === x.team) && guard++ < 20);
+    last = n; th.innerHTML = mrChip(n); nm.textContent = n;
+    const gap = 45 + 215 * Math.pow(t / dur, 1.6);
+    t += gap; setTimeout(tick, gap);
+  };
+  tick();
+}
+
 function render() {
   stGen++;
-  const stageView = S.view === "stage";
-  document.body.classList.toggle("drafting", stageView || S.phase === "draft");
-  document.body.classList.toggle("staging", stageView);
+  const stageView = S.view === "stage", matchView = S.view === "match";
+  document.body.classList.toggle("drafting", stageView || matchView || S.phase === "draft");
+  document.body.classList.toggle("staging", stageView || matchView);
   if (stageView) renderStage();
+  else if (matchView) renderMatch();
   else S.phase !== "draft" ? renderSetup() : S.mode === "simul" ? renderSimul() : renderDraft();
   if (!AUD) bindResultButtons();
   if (!AUD) {
@@ -1804,20 +1989,23 @@ function render() {
 if (S.view === undefined) S.view = S.phase === "draft" ? "main" : "stage";
 if (!S.stg) S.stg = { shown: 0, at: 0 };
 /* 上のタブ：ステージ ⇔ 準備・ドラフト・結果（観客用画面では押せない） */
-["stage", "setup", "draft", "done"].forEach(k => {
+["stage", "setup", "draft", "done", "match"].forEach(k => {
   const el = $("ph-" + k);
   if (AUD) { el.disabled = true; return }
   el.onclick = () => {
-    if (k === "stage" ? S.view === "stage" : S.view !== "stage") return;
+    const v = k === "stage" ? "stage" : k === "match" ? "match" : "main";
+    if (S.view === v) return;
     if (S.view === "stage" && stBusy(stageData())) return;
-    S.view = k === "stage" ? "stage" : "main"; save(); render(); window.scrollTo({ top: 0 });
+    if (S.view === "match" && mrBusy(mrData())) return;
+    S.view = v; save(); render(); window.scrollTo({ top: 0 });
   };
 });
 /* ステージ画面：スペース・→ で次を発表、← で戻す */
 addEventListener("keydown", e => {
-  if (AUD || S.view !== "stage" || e.target.closest("input,textarea,select,button")) return;
-  if (e.key === " " || e.key === "ArrowRight") { e.preventDefault(); stageNext() }
-  else if (e.key === "ArrowLeft") { e.preventDefault(); $("stBack") && $("stBack").click() }
+  if (AUD || (S.view !== "stage" && S.view !== "match") || e.target.closest("input,textarea,select")) return;
+  const mv = S.view === "match";
+  if (e.key === " " || e.key === "ArrowRight") { e.preventDefault(); mv ? matchNext() : stageNext() }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); const b = $(mv ? "mrBack" : "stBack"); b && b.click() }
 });
 /* 観客用画面では、発表まで指名を伏せるのを既定にする */
 if (S.hide === undefined) S.hide = true;
