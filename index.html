@@ -2059,7 +2059,7 @@ async function rmTick() {
     else rmPaint();
   } catch (e) {
     rmView.ok = false;
-    rmView.err = e.name === "AbortError" ? "スプレッドシートからの応答がありません。" : e.code === "admin" || e.code === "nosession" ? e.message : "受付と通信できませんでした（" + e.message + "）。";
+    rmView.err = e.name === "AbortError" ? "スプレッドシートからの応答がありません。" : e.code === "admin" || e.code === "nosession" ? e.message : /fetch|network|load failed/i.test(e.message) ? "受付と通信できませんでした。スプレッドシートのメニュー「ドラフト」→「リーダー指名の受付をリセットする」を一度実行して、表示される承認を許可してください。" : "受付と通信できませんでした（" + e.message + "）。";
     if (e.code === "nosession" && S.rm) { S.rm.ready = false; save() }
     rmPaint();
   } finally { rmPolling = false }
