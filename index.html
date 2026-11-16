@@ -502,6 +502,23 @@
 
 
 
+
+  /* リーダー指名 */
+  .rmbox { margin: 10px 0 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px }
+  .rmbox summary { display: flex; align-items: center; gap: 14px; cursor: pointer; flex-wrap: wrap }
+  .rmbox summary b { font-size: 14px }
+  .rm-st { font-size: 12px; font-weight: 700; color: var(--fg-3) }
+  .rm-st.bad, .rm-err { color: var(--accent) }
+  .rm-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px }
+  .rm-list li { display: grid; grid-template-columns: minmax(150px, 220px) 1fr auto; gap: 8px; align-items: center }
+  .rm-team { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 13px; min-width: 0 }
+  .rm-team .sw { width: 12px; height: 12px; border-radius: 50%; background: var(--tc); flex: none; box-shadow: 0 0 0 1px rgba(0,0,0,.15) }
+  .rm-team small { font-weight: 700; color: var(--fg-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+  .rm-url { font: 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg-2); min-width: 0; width: 100% }
+  .rm-foot { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 8px }
+  .rm-foot .toast { opacity: 0; transition: opacity .2s; font-size: 12px; font-weight: 800; color: var(--accent) }
+  .rm-foot .toast.on { opacity: 1 }
+  @media (max-width: 640px) { .rm-list li { grid-template-columns: 1fr auto } .rm-team { grid-column: 1 / -1 } }
   /* 試合結果 */
   .mr .th { display: block }
   .mr .th .tchip { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 800; font-size: 26px; border-radius: inherit }
@@ -928,9 +945,9 @@ function renderSetup() {
       <div class="seg" role="group" aria-label="チーム数"><span class="lab">チーム数</span>${segBtns("tcount", [2, 3, 4, 5, 6, 7, 8], S.teamCount, v => v)}</div>
       <div class="seg" role="group" aria-label="1チームの人数"><span class="lab">人数</span>${segBtns("tsize", [3, 4, 5, 6], S.teamSize, v => v + "人")}</div>
       <div class="seg" role="group" aria-label="指名方式"><span class="lab">方式</span>${segBtns("mode", ["simul", "snake", "linear"], S.mode, v => v === "simul" ? "同時指名（重複は抽選）" : v === "snake" ? "スネーク" : "毎巡同じ順")}</div>
-      ${S.mode === "simul" ? `<label class="check"><input type="checkbox" id="hide" ${S.hide ? "checked" : ""}>発表まで指名を隠す</label>` : `<label class="check"><input type="checkbox" id="shuffle" ${S.shuffle ? "checked" : ""}>指名順をくじで決める</label>`}
+      ${S.mode === "simul" ? `<label class="check"><input type="checkbox" id="hide" ${S.hide ? "checked" : ""}>発表まで指名を隠す</label>${remoteUsable() ? `<label class="check"><input type="checkbox" id="remote" ${S.remote ? "checked" : ""}>リーダーが各自の端末で指名する</label>` : ""}` : `<label class="check"><input type="checkbox" id="shuffle" ${S.shuffle ? "checked" : ""}>指名順をくじで決める</label>`}
     </div>
-    <p class="hint">${MODE_HINT[S.mode]}</p>
+    <p class="hint">${MODE_HINT[S.mode]}${S.mode === "simul" && S.remote && remoteUsable() ? "<br>リーダー指名：ドラフトを始めると、チームごとの指名用URLが表示されます。リーダーはそのURLを自分のスマホやPCで開いて指名し、全チームそろったら運営が発表します。" : ""}</p>
     <div class="field"><p class="h4">チームとキャプテン（上から指名順）</p>
       <div class="team-rows" style="max-width:640px">${teamRows}</div>
       <datalist id="playerNames">${players.map(p => `<option value="${esc(p.name)}">`).join("")}</datalist>
@@ -950,6 +967,7 @@ function renderSetup() {
   document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { S.mode = b.dataset.mode; save(); render() });
   if ($("shuffle")) $("shuffle").onchange = e => { S.shuffle = e.target.checked; save() };
   if ($("hide")) $("hide").onchange = e => { S.hide = e.target.checked; save() };
+  if ($("remote")) $("remote").onchange = e => { S.remote = e.target.checked; save(); render() };
   document.querySelectorAll("[data-tn]").forEach(el => el.oninput = e => { S.setupTeams[+el.dataset.tn].name = e.target.value; save() });
   document.querySelectorAll("[data-tc]").forEach(el => {
     el.oninput = e => { S.setupTeams[+el.dataset.tc].captain = e.target.value; save() };
@@ -986,7 +1004,8 @@ function startDraft() {
   if (!pool.length) { err.textContent = "指名される選手がいません。出場選手を確認してください。"; return }
   if (S.shuffle && S.mode !== "simul") { for (let i = teams.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[teams[i], teams[j]] = [teams[j], teams[i]] } }
   Object.assign(S, { phase: "draft", teams, pool, picks: [] });
-  if (S.mode === "simul") initSimul();
+  S.rm = null;
+  if (S.mode === "simul") { initSimul(); if (S.remote && remoteUsable()) rmInit() }
   save(); render(); window.scrollTo({ top: 0 });
 }
 
@@ -1327,8 +1346,10 @@ function nextRoundIfNeeded() {
 function nominate(pid) {
   if (S.stage !== "nominate" || S.active < 0) return;
   snapshot();
+  const ti = S.active;
   if (S.noms[S.active] === pid) delete S.noms[S.active];
   else S.noms[S.active] = pid;
+  rmPush(ti, S.noms[ti]);
   const next = pendingTeams().find(i => S.noms[i] == null);
   if (next != null && S.noms[S.active] != null) S.active = next;
   save(); render();
@@ -1440,6 +1461,7 @@ function renderSimul() {
     : (done ? "下の結果をコピーして共有できます。"
       : S.stage === "announce" ? "「幕を開ける」を押すたびに、1チームずつ幕が開いて指名選手が出ます。"
       : S.stage === "lottery" ? "「スロットを回す」を押すと、止まったチームが交渉権を獲得します。"
+      : remoteOn() ? "リーダーの指名が届くと「指名済み」になります。全チームそろったら「指名を発表する」。運営がチームを選んで代わりに入力することもできます。"
       : "チームを選んでから選手を押すと、そのチームの指名になります。全チームの指名がそろったら「指名を発表する」。");
   setFacts([[n, "チーム"], [S.picks.length + " / " + total, "指名確定"], [avail.length, "人が残り"], [S.picks.filter(p => p.lottery).length, "回の抽選"]]);
 
@@ -1541,7 +1563,7 @@ function renderSimul() {
       ${AUD ? "" : `<div class="seg"><span class="toast" id="toast">${toastMsg}</span><button class="more sm primary" id="pngAll">全チームの画像を保存</button><button class="more sm" id="copy">テキストをコピー</button></div>`}</div>
       <details class="rtext"><summary>テキストで見る</summary><pre class="result" id="resultText">${esc(resultText())}</pre></details></section>` : "";
 
-  $("app").innerHTML = done ? `${banner}${resultTeamsHTML()}${resultBlock}` : S.stage === "announce" ? `${banner}${annHtml}<section class="teams" aria-label="チーム" style="margin-top:24px">${teamsHtml}</section>` : `${banner}${statusRow}${lotHtml}
+  $("app").innerHTML = done ? `${banner}${resultTeamsHTML()}${resultBlock}` : S.stage === "announce" ? `${banner}${annHtml}${AUD ? "" : rmPanelHTML()}<section class="teams" aria-label="チーム" style="margin-top:24px">${teamsHtml}</section>` : `${banner}${statusRow}${AUD ? "" : rmPanelHTML()}${lotHtml}
     <div class="board">
       <section class="panel"><div class="panel-head"><h2>選手プール</h2></div>${poolHtml}
         ${!AUD && S.stage === "nominate" && !done ? '<p class="hint">ほかのチームと同じ選手を指名しても大丈夫です。重なったら抽選になります。</p>' : ""}</section>
@@ -1557,6 +1579,8 @@ function renderSimul() {
   });
   document.querySelectorAll("[data-spin]").forEach(b => b.onclick = () => spin(+b.dataset.spin));
   if ($("reveal")) $("reveal").onclick = startAnnounce;
+  rmBind();
+  if (remoteOn()) { const d = rmDesired(); if (!S.rm.ready || !S.rm.sent || S.rm.sent.rid !== d.rid || S.rm.sent.open !== d.open) setTimeout(rmTick, 0) }
   if ($("annNext")) $("annNext").onclick = announceNext;
   if ($("annGo")) $("annGo").onclick = reveal;
   if ($("confirmLot")) $("confirmLot").onclick = confirmLotteries;
@@ -1897,9 +1921,9 @@ function renderMatch() {
 
   const maxv = Math.max(...top.map(x => x.total), 1);
   const rows = top.map((x, pos) => mrRowHTML(x, pos, pos >= first, maxv, n >= 2 && pos <= 1)).join("");
-  const label = done ? "発表終了" : busy ? "発表中…" : nextFinal ? (n >= 2 ? "1位・2位を発表" : "1位を発表") : `${top[nextPos].rank}位を発表`;
+  const label = busy ? "発表中…" : done ? "発表終了" : nextFinal ? (n >= 2 ? "1位・2位を発表" : "1位を発表") : `${top[nextPos].rank}位を発表`;
   $("app").innerHTML = `${AUD ? "" : `<div class="sctrl">
-      <span class="hint">${done ? "すべて発表しました。" : shown ? "スペースキー・→ でも次へ進めます。" : `発表前はシートの最新の順位を表示に使います。<button class="linkbtn" id="mrReload">いま読み込み直す</button>`}</span>
+      <span class="hint">${busy ? "発表中です…" : done ? "すべて発表しました。" : shown ? "スペースキー・→ でも次へ進めます。" : `発表前はシートの最新の順位を表示に使います。<button class="linkbtn" id="mrReload">いま読み込み直す</button>`}</span>
       <span class="seg"><button class="more primary" id="mrNext" ${done || busy ? "disabled" : ""}>${label}</button></span></div>`}
     <section class="sboard mrboard" aria-label="試合結果の順位">${rows}</section>`;
   if (!busy && nextPos >= 0) {
@@ -1968,6 +1992,142 @@ function mrShuffle(row, x, names, dur, from, done, gen) {
   tick();
 }
 
+/* ===== リーダー指名：各チームのリーダーが自分の端末で指名し、運営は集まったら発表する ===== */
+const ADMIN_KEY_NAME = "splat-draft-admin";
+function randId(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); return Array.from(a, b => "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b % 56]).join("") }
+function adminKey() {
+  let k = null; try { k = localStorage.getItem(ADMIN_KEY_NAME) } catch (e) { }
+  if (!k) { k = randId(32); try { localStorage.setItem(ADMIN_KEY_NAME, k) } catch (e) { } }
+  return k;
+}
+function remoteUsable() { return !!API_URL && !onAppsScript() && S.source === "sheet" && rosterState.kind !== "sample" }
+function remoteOn() { return !AUD && S.phase === "draft" && S.mode === "simul" && S.rm && S.rm.on }
+function leaderURL(ti) { return API_URL + (API_URL.includes("?") ? "&" : "?") + "view=leader&t=" + S.rm.tokens[ti] }
+function rmRid() { return S.round + "-" + S.attempt }
+
+let rmInflight = 0, rmTimer = 0, rmPolling = false, rmOpen = null;
+const rmView = { ok: false, err: "", at: 0 };
+async function rmCall(action, extra) {
+  const q = new URLSearchParams({ action, key: adminKey(), sid: S.rm.sid, ...extra });
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 20000);
+  try {
+    const res = await fetch(API_URL + (API_URL.includes("?") ? "&" : "?") + q.toString(), { signal: ctl.signal, cache: "no-store" });
+    const body = await res.json();
+    if (!body.ok) {
+      const e = new Error(body.msg || body.error || "エラー");
+      e.code = body.error; throw e;
+    }
+    return body;
+  } finally { clearTimeout(t) }
+}
+/* ドラフト開始時：受付を作る */
+function rmInit() {
+  S.rm = { on: true, sid: randId(12), tokens: S.teams.map(() => randId(20)), ready: false, sent: null };
+}
+function rmDesired() {
+  if (S.stage === "done") return { rid: rmRid(), open: false };
+  return { rid: rmRid(), open: S.stage === "nominate" };
+}
+function rmRoundData(d) {
+  const pend = S.stage === "nominate" ? pendingTeams() : (S.stage === "announce" ? S.annOrder : pendingTeams());
+  const label = S.attempt === 1 ? `${S.round}巡目の指名` : `${S.round}巡目・外れの再指名`;
+  return {
+    rid: d.rid, label, open: d.open, pend,
+    avail: available().map(p => p.id),
+    members: S.teams.map((t, i) => [t.captain.name + "（リーダー）", ...membersOf(i).map(p => p.name)])
+  };
+}
+/* 受付の状態を運営ツールに合わせ、リーダーの指名を取り込む */
+async function rmTick() {
+  if (!remoteOn() || rmPolling) return;
+  rmPolling = true;
+  try {
+    if (!S.rm.ready) {
+      await rmCall("session", { data: JSON.stringify({ sid: S.rm.sid, teams: S.teams.map((t, i) => ({ name: t.name, captain: t.captain.name, bg: COLORS[t.color].bg, fg: COLORS[t.color].fg, token: S.rm.tokens[i] })) }) });
+      S.rm.ready = true; S.rm.sent = null; save();
+    }
+    const d = rmDesired();
+    let st;
+    if (!S.rm.sent || S.rm.sent.rid !== d.rid || S.rm.sent.open !== d.open) {
+      st = await rmCall("round", { data: JSON.stringify(rmRoundData(d)) });
+      S.rm.sent = d; save();
+    } else if (S.stage === "nominate") {
+      st = await rmCall("status", {});
+    }
+    rmView.ok = true; rmView.err = ""; rmView.at = Date.now();
+    if (st && rmInflight === 0) rmMerge(st);
+    else rmPaint();
+  } catch (e) {
+    rmView.ok = false;
+    rmView.err = e.name === "AbortError" ? "スプレッドシートからの応答がありません。" : e.code === "admin" || e.code === "nosession" ? e.message : "受付と通信できませんでした（" + e.message + "）。";
+    if (e.code === "nosession" && S.rm) { S.rm.ready = false; save() }
+    rmPaint();
+  } finally { rmPolling = false }
+}
+function rmMerge(st) {
+  if (!remoteOn() || S.stage !== "nominate" || st.rid !== rmRid()) { rmPaint(); return }
+  const avail = new Set(available().map(p => p.id));
+  let changed = false;
+  for (const i of pendingTeams()) {
+    const n = st.noms[i], pid = n && avail.has(n.p) ? n.p : null;
+    const cur = S.noms[i] ?? null;
+    if (pid !== cur && (pid || (S.rm.from && S.rm.from[i] === "leader"))) {
+      if (pid) S.noms[i] = pid; else delete S.noms[i];
+      changed = true;
+    }
+    S.rm.from = S.rm.from || {};
+    S.rm.from[i] = n ? n.by : null;
+  }
+  if (changed) { save(); render() } else rmPaint();
+}
+/* 運営が代わりに入力したときは受付にも送る */
+function rmPush(ti, pid) {
+  if (!remoteOn() || !S.rm.ready) return;
+  rmInflight++;
+  rmCall("setnom", { rid: rmRid(), ti: String(ti), pid: pid || "" })
+    .then(st => { rmView.ok = true; rmView.err = ""; rmView.at = Date.now(); if (rmInflight === 1) rmMerge(st) })
+    .catch(e => { rmView.ok = false; rmView.err = "代理入力を受付に送れませんでした（" + e.message + "）。"; rmPaint() })
+    .finally(() => { rmInflight-- });
+}
+function rmStart() {
+  clearInterval(rmTimer);
+  if (AUD) return;
+  rmTimer = setInterval(rmTick, 3000);
+}
+/* 受付の状態表示（描き直さずに文字だけ更新） */
+function rmStatusText() {
+  if (rmView.err) return `<span class="rm-err">${esc(rmView.err)}</span>`;
+  if (!rmView.at) return "受付に接続しています…";
+  const t = new Date(rmView.at).toLocaleTimeString("ja-JP");
+  return S.stage === "nominate" ? `受付中 ・ ${t} に確認` : `受付は締め切り中 ・ ${t} に確認`;
+}
+function rmPaint() { const el = $("rmStatus"); if (el) { el.innerHTML = rmStatusText(); el.classList.toggle("bad", !!rmView.err) } }
+function rmPanelHTML() {
+  if (!remoteOn()) return "";
+  const rows = S.teams.map((t, i) => {
+    const c = COLORS[t.color];
+    return `<li><span class="rm-team" style="--tc:${c.bg};--tf:${c.fg}"><span class="sw"></span>${esc(t.name)}<small>${esc(t.captain.name)}</small></span>
+      <input class="rm-url" readonly value="${esc(leaderURL(i))}" aria-label="${esc(t.name)}の指名URL">
+      <button class="more sm" data-rmcopy="${i}">コピー</button></li>`;
+  }).join("");
+  const open = rmOpen ?? (S.round === 1 && S.attempt === 1);
+  return `<details class="rmbox" id="rmBox" ${open ? "open" : ""}><summary><b>リーダー用の指名URL</b><span class="rm-st" id="rmStatus">${rmStatusText()}</span></summary>
+    <p class="hint">各チームのリーダーに、そのチームのURLだけを送ってください（URLを知っている人はそのチームとして指名できます）。リーダーが指名すると「指名済み」になり、全チームそろったら「指名を発表する」で公開します。運営が選手を押して代わりに入力することもできます。</p>
+    <ul class="rm-list">${rows}</ul>
+    <div class="rm-foot"><span class="toast" id="rmToast"></span><button class="more sm" id="rmCopyAll">全チーム分をまとめてコピー</button></div></details>`;
+}
+function rmBind() {
+  const flash = msg => { const t = $("rmToast"); if (t) { t.textContent = msg; t.classList.add("on"); setTimeout(() => t.classList.remove("on"), 1800) } };
+  const copy = (text, msg) => (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => flash(msg), () => {
+    const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); flash(msg) } catch (e) { flash("コピーできませんでした") } ta.remove();
+  });
+  document.querySelectorAll("[data-rmcopy]").forEach(b => b.onclick = () => copy(leaderURL(+b.dataset.rmcopy), "コピーしました"));
+  if ($("rmCopyAll")) $("rmCopyAll").onclick = () => copy(S.teams.map((t, i) => `【${t.name}】リーダー：${t.captain.name}\n${leaderURL(i)}`).join("\n\n"), "全チーム分をコピーしました");
+  document.querySelectorAll(".rm-url").forEach(el => el.onfocus = () => el.select());
+  if ($("rmBox")) $("rmBox").ontoggle = e => { rmOpen = e.target.open };
+}
+
 function render() {
   stGen++;
   const stageView = S.view === "stage", matchView = S.view === "match";
@@ -2029,6 +2189,7 @@ if (AUD) {
 }
 render();
 loadRoster();
+rmStart();
 </script>
 
 
