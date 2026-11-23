@@ -1993,13 +1993,7 @@ function mrShuffle(row, x, names, dur, from, done, gen) {
 }
 
 /* ===== リーダー指名：各チームのリーダーが自分の端末で指名し、運営は集まったら発表する ===== */
-const ADMIN_KEY_NAME = "splat-draft-admin";
 function randId(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); return Array.from(a, b => "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b % 56]).join("") }
-function adminKey() {
-  let k = null; try { k = localStorage.getItem(ADMIN_KEY_NAME) } catch (e) { }
-  if (!k) { k = randId(32); try { localStorage.setItem(ADMIN_KEY_NAME, k) } catch (e) { } }
-  return k;
-}
 function remoteUsable() { return !!API_URL && !onAppsScript() && S.source === "sheet" && rosterState.kind !== "sample" }
 function remoteOn() { return !AUD && S.phase === "draft" && S.mode === "simul" && S.rm && S.rm.on }
 function leaderURL(ti) { return API_URL + (API_URL.includes("?") ? "&" : "?") + "view=leader&t=" + S.rm.tokens[ti] }
@@ -2008,7 +2002,7 @@ function rmRid() { return S.round + "-" + S.attempt }
 let rmInflight = 0, rmTimer = 0, rmPolling = false, rmOpen = null;
 const rmView = { ok: false, err: "", at: 0 };
 async function rmCall(action, extra) {
-  const q = new URLSearchParams({ action, adm: adminKey(), ses: S.rm.sid, ...extra });  // c・sid は Apps Script の予約語
+  const q = new URLSearchParams({ action, ses: S.rm.sid, ...extra });  // c・sid は Apps Script の予約語
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 20000);
   try {
     const res = await fetch(API_URL + (API_URL.includes("?") ? "&" : "?") + q.toString(), { signal: ctl.signal, cache: "no-store" });
@@ -2039,7 +2033,7 @@ function rmRoundData(d) {
 }
 /* 受付の状態を運営ツールに合わせ、リーダーの指名を取り込む */
 async function rmTick() {
-  if (!remoteOn() || rmPolling) return;
+  if (!remoteOn() || rmPolling || S.rm.lost) return;
   rmPolling = true;
   try {
     if (!S.rm.ready) {
@@ -2059,8 +2053,8 @@ async function rmTick() {
     else rmPaint();
   } catch (e) {
     rmView.ok = false;
-    rmView.err = e.name === "AbortError" ? "スプレッドシートからの応答がありません。" : e.code === "admin" || e.code === "nosession" ? e.message : /fetch|network|load failed/i.test(e.message) ? "受付と通信できませんでした。スプレッドシートのメニュー「ドラフト」→「リーダー指名の受付をリセットする」を一度実行して、表示される承認を許可してください。" : "受付と通信できませんでした（" + e.message + "）。";
-    if (e.code === "nosession" && S.rm) { S.rm.ready = false; save() }
+    rmView.err = e.name === "AbortError" ? "スプレッドシートからの応答がありません。" : e.code === "nosession" ? e.message : /fetch|network|load failed/i.test(e.message) ? "受付と通信できませんでした。スプレッドシートのメニュー「ドラフト」→「リーダー指名の受付をリセットする」を一度実行して、表示される承認を許可してください。" : "受付と通信できませんでした（" + e.message + "）。";
+    if (e.code === "nosession" && S.rm) { S.rm.lost = true; save(); render() }
     rmPaint();
   } finally { rmPolling = false }
 }
@@ -2096,6 +2090,7 @@ function rmStart() {
 }
 /* 受付の状態表示（描き直さずに文字だけ更新） */
 function rmStatusText() {
+  if (S.rm && S.rm.lost) return `<span class="rm-err">別の画面でリーダー指名の受付が作り直されたため、この画面は受付と連動していません。</span>`;
   if (rmView.err) return `<span class="rm-err">${esc(rmView.err)}</span>`;
   if (!rmView.at) return "受付に接続しています…";
   const t = new Date(rmView.at).toLocaleTimeString("ja-JP");
@@ -2110,11 +2105,11 @@ function rmPanelHTML() {
       <input class="rm-url" readonly value="${esc(leaderURL(i))}" aria-label="${esc(t.name)}の指名URL">
       <button class="more sm" data-rmcopy="${i}">コピー</button></li>`;
   }).join("");
-  const open = rmOpen ?? (S.round === 1 && S.attempt === 1);
+  const open = S.rm.lost || (rmOpen ?? (S.round === 1 && S.attempt === 1));
   return `<details class="rmbox" id="rmBox" ${open ? "open" : ""}><summary><b>リーダー用の指名URL</b><span class="rm-st" id="rmStatus">${rmStatusText()}</span></summary>
     <p class="hint">各チームのリーダーに、そのチームのURLだけを送ってください（URLを知っている人はそのチームとして指名できます）。リーダーが指名すると「指名済み」になり、全チームそろったら「指名を発表する」で公開します。運営が選手を押して代わりに入力することもできます。</p>
     <ul class="rm-list">${rows}</ul>
-    <div class="rm-foot"><span class="toast" id="rmToast"></span><button class="more sm" id="rmCopyAll">全チーム分をまとめてコピー</button></div></details>`;
+    <div class="rm-foot">${S.rm.lost ? '<button class="more sm primary" id="rmTake">この画面で受付を作り直す</button>' : ""}<span class="toast" id="rmToast"></span><button class="more sm" id="rmCopyAll">全チーム分をまとめてコピー</button></div></details>`;
 }
 function rmBind() {
   const flash = msg => { const t = $("rmToast"); if (t) { t.textContent = msg; t.classList.add("on"); setTimeout(() => t.classList.remove("on"), 1800) } };
@@ -2125,6 +2120,7 @@ function rmBind() {
   document.querySelectorAll("[data-rmcopy]").forEach(b => b.onclick = () => copy(leaderURL(+b.dataset.rmcopy), "コピーしました"));
   if ($("rmCopyAll")) $("rmCopyAll").onclick = () => copy(S.teams.map((t, i) => `【${t.name}】リーダー：${t.captain.name}\n${leaderURL(i)}`).join("\n\n"), "全チーム分をコピーしました");
   document.querySelectorAll(".rm-url").forEach(el => el.onfocus = () => el.select());
+  if ($("rmTake")) $("rmTake").onclick = () => { S.rm.lost = false; S.rm.ready = false; S.rm.sent = null; rmView.err = ""; save(); render(); rmTick() };
   if ($("rmBox")) $("rmBox").ontoggle = e => { rmOpen = e.target.open };
 }
 
