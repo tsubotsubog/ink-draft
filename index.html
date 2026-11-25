@@ -2766,6 +2766,223 @@
       }
     }
 
+    /* リーダー画面 */
+    body.leader .tabs,
+    body.leader .head-actions,
+    body.leader footer span:nth-child(2) {
+      display: none
+    }
+
+    body.leader #app {
+      padding-bottom: 24px
+    }
+
+    body.lv-bar-on #app {
+      padding-bottom: 110px
+    }
+
+    .lv-sw {
+      display: inline-block;
+      width: .7em;
+      height: .7em;
+      border-radius: 50%;
+      background: var(--lv-tc);
+      margin-right: .35em;
+      vertical-align: .05em;
+      box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--line)
+    }
+
+    .lv-status {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      background: var(--surface);
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 14px
+    }
+
+    .lv-status .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--fg-3);
+      margin-top: 6px;
+      flex: none
+    }
+
+    .lv-status b {
+      font-size: 18px;
+      display: block
+    }
+
+    .lv-status p {
+      margin: 4px 0 0;
+      font-size: 13.5px;
+      color: var(--fg-2);
+      line-height: 1.6
+    }
+
+    .lv-status.open {
+      border: 1px solid var(--line);
+      box-shadow: inset 5px 0 0 var(--accent)
+    }
+
+    .lv-status.open .dot {
+      background: var(--accent);
+      animation: lvPulse 1.4s ease-in-out infinite
+    }
+
+    .lv-status.bad {
+      border-color: var(--accent)
+    }
+
+    .lv-status.bad .dot {
+      background: var(--accent)
+    }
+
+    @keyframes lvPulse {
+      50% {
+        box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 20%, transparent)
+      }
+    }
+
+    .lv-mine .panel-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap
+    }
+
+    .lv-mine .panel-head .more {
+      margin-left: auto
+    }
+
+    .lv-mine .prow {
+      border-bottom: 0
+    }
+
+    .lv-q {
+      margin-left: auto
+    }
+
+    .lv-q input {
+      font: inherit;
+      font-size: 15px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--bg);
+      width: min(280px, 60vw)
+    }
+
+    .plist.pickable .prow[data-id] {
+      cursor: pointer
+    }
+
+    .prow.sel {
+      background: color-mix(in srgb, var(--accent) 9%, transparent) !important;
+      box-shadow: inset 5px 0 0 var(--accent)
+    }
+
+    .prow.cur {
+      box-shadow: inset 5px 0 0 var(--lv-tc, var(--sumi))
+    }
+
+    .prow.cur .pn small {
+      color: var(--accent)
+    }
+
+    .lv-team {
+      max-width: none
+    }
+
+    .lv-bar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 20;
+      background: var(--sumi);
+      color: #fff;
+      border-top: 3px double var(--kin);
+      padding: 12px 0 calc(12px + env(safe-area-inset-bottom))
+    }
+
+    .lv-bar[hidden] {
+      display: none
+    }
+
+    .lv-bar .wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px
+    }
+
+    .lv-bar .nm {
+      flex: 1;
+      min-width: 0;
+      font-weight: 800;
+      font-size: 17px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap
+    }
+
+    .lv-bar .nm small {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      opacity: .75
+    }
+
+    .lv-bar #lvClear {
+      background: transparent;
+      color: #fff;
+      border-color: rgba(255, 255, 255, .4)
+    }
+
+    .lv-toast {
+      position: fixed;
+      left: 50%;
+      top: 84px;
+      transform: translateX(-50%);
+      z-index: 30;
+      background: var(--sumi);
+      color: #fff;
+      border-radius: 999px;
+      padding: 10px 20px;
+      font-weight: 800;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity .2s;
+      pointer-events: none
+    }
+
+    .lv-toast.on {
+      opacity: 1
+    }
+
+    @media (max-width: 640px) {
+      .lv-bar .nm {
+        font-size: 15px
+      }
+
+      .lv-bar #lvClear {
+        display: none
+      }
+
+      .lv-q {
+        margin-left: 0;
+        width: 100%
+      }
+
+      .lv-q input {
+        width: 100%
+      }
+    }
+
     /* 試合結果 */
     .mr .th {
       display: block
@@ -3376,6 +3593,7 @@
     const ROSTER_KEY = "splat-draft-roster";
     /* 観客用画面（配信用）：URL の末尾が #audience のとき。操作はできず、運営用画面の状態を表示するだけ */
     const AUD = location.hash === "#audience";
+    const LEADER = (location.hash.match(/^#leader=([A-Za-z0-9_-]{8,})/) || [])[1] || "";
 
     /* API につながらないときに表示するサンプル選手（架空） */
     const SAMPLE_ROSTER = [
@@ -3408,7 +3626,7 @@
     let resetArmed = false, lastPick = null, toastMsg = "", openPR = new Set();
 
     function load() { try { const v = localStorage.getItem(KEY); return v ? JSON.parse(v) : null } catch (e) { return null } }
-    function save() { if (AUD) return; try { localStorage.setItem(KEY, JSON.stringify(S)) } catch (e) { } }
+    function save() { if (AUD || LEADER) return; try { localStorage.setItem(KEY, JSON.stringify(S)) } catch (e) { } }
     const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const $ = id => document.getElementById(id);
     const safeSrc = u => /^(data:image\/|https:\/\/)/.test(u || "") ? u : "";
@@ -4691,7 +4909,11 @@
     function randId(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); return Array.from(a, b => "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b % 56]).join("") }
     function remoteUsable() { return !!API_URL && !onAppsScript() && S.source === "sheet" && rosterState.kind !== "sample" }
     function remoteOn() { return !AUD && S.phase === "draft" && S.mode === "simul" && S.rm && S.rm.on }
-    function leaderURL(ti) { return API_URL + (API_URL.includes("?") ? "&" : "?") + "view=leader&t=" + S.rm.tokens[ti] }
+    /* GitHub Pages などに置いたときは、このツール自身の #leader=合言葉。ファイルを直接開いているときは Apps Script の簡易画面 */
+    function leaderURL(ti) {
+      if (/^https?:$/.test(location.protocol)) return location.origin + location.pathname + "#leader=" + S.rm.tokens[ti];
+      return API_URL + (API_URL.includes("?") ? "&" : "?") + "view=leader&t=" + S.rm.tokens[ti];
+    }
     function rmRid() { return S.round + "-" + S.attempt }
 
     let rmInflight = 0, rmTimer = 0, rmPolling = false, rmOpen = null;
@@ -4723,7 +4945,7 @@
       return {
         rid: d.rid, label, open: d.open, pend,
         avail: available().map(p => p.id),
-        members: S.teams.map((t, i) => [t.captain.name + "（リーダー）", ...membersOf(i).map(p => p.name)])
+        members: S.teams.map((t, i) => [t.captain, ...membersOf(i)].map(p => ({ id: p.id, name: p.name })))
       };
     }
     /* 受付の状態を運営ツールに合わせ、リーダーの指名を取り込む */
@@ -4819,6 +5041,149 @@
       if ($("rmBox")) $("rmBox").ontoggle = e => { rmOpen = e.target.open };
     }
 
+    /* ===== リーダー画面（#leader=合言葉）：自分のチームの指名だけができる ===== */
+    const L = { st: null, players: [], members: [], rid: null, sel: null, busy: false, err: "", memo: {} };
+    function lvSet(id, html) { const el = $(id); if (el && L.memo[id] !== html) { L.memo[id] = html; el.innerHTML = html } }
+    function lvCan() { const r = L.st && L.st.ok && L.st.round; return !!(r && r.open && r.mine) }
+    function lvPlayer(id) { return L.players.find(p => p.id === id) || null }
+    function lvToast(msg) {
+      const t = $("lvToast"); if (!t) return;
+      t.textContent = msg; t.classList.add("on"); clearTimeout(lvToast.t); lvToast.t = setTimeout(() => t.classList.remove("on"), 2600);
+    }
+    async function lvCall(params) {
+      const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 20000);
+      try {
+        const res = await fetch(API_URL + (API_URL.includes("?") ? "&" : "?") + new URLSearchParams(params).toString(), { cache: "no-store", signal: ctl.signal });
+        return await res.json();
+      } finally { clearTimeout(tm) }
+    }
+    async function lvLoad() {
+      try {
+        const r = await lvCall({ action: "leader", t: LEADER, known: L.rid || "" });
+        L.err = "";
+        if (r.players) { L.players = r.players; L.members = r.memberPlayers || []; L.rid = r.round ? r.round.rid : null; if (!lvPlayer(L.sel)) L.sel = null }
+        if (r.ok && !r.round) { L.players = []; L.members = []; L.rid = null; L.sel = null }
+        L.st = r;
+      } catch (e) {
+        L.err = "通信できませんでした。電波のよい場所で、このまま少しお待ちください（自動で再接続します）。";
+      }
+      lvRender();
+    }
+    async function lvSend(pid) {
+      if (L.busy || !lvCan()) return;
+      L.busy = true; lvRender();
+      try {
+        const r = await lvCall({ action: "lnom", t: LEADER, rid: L.rid, pid: pid || "" });
+        if (!r.ok) lvToast(r.msg || "送信できませんでした");
+        else { lvToast(pid ? "指名を送りました" : "指名を取り消しました"); L.sel = null }
+      } catch (e) { lvToast("送信できませんでした。もう一度押してください。") }
+      L.busy = false;
+      await lvLoad();
+    }
+    function lvRowHTML(p, i, opts) {
+      return `<div class="prow ${opts.cls || ""}" role="row" ${opts.click ? `data-id="${esc(p.id)}" tabindex="0"` : ""}>
+    <span class="pno" role="cell">${opts.no ?? i + 1}</span>
+    <span class="pwho" role="cell">${avatar(p, "m")}<span class="pn">${opts.tag || ""}${esc(p.name)}</span></span>
+    <span class="pweap" role="cell">${weaponChips(p)}</span>
+    <span class="ppts" role="cell">${ptsMini(p) || '<span class="wnone">—</span>'}</span>
+    <span class="ppr" role="cell">${p.pr ? esc(p.pr) : '<span class="wnone">—</span>'}</span>
+  </div>`;
+    }
+    function lvRender() {
+      const st = L.st, r = st && st.ok ? st.round : null;
+      /* 見出し */
+      if (st && st.ok) {
+        const t = st.team;
+        document.documentElement.style.setProperty("--lv-tc", t.bg || "var(--sumi)");
+        document.documentElement.style.setProperty("--lv-tf", t.fg || "#fff");
+        $("heroEyebrow").textContent = "LEADER ・ 指名画面";
+        $("heroTitle").innerHTML = `<span class="lv-sw"></span>${esc(t.name)}`;
+        $("heroSub").textContent = t.captain ? `リーダー：${t.captain}　自分のチームの指名だけができます。` : "自分のチームの指名だけができます。";
+        setFacts([[L.members.length, "メンバー"], [r && r.mine ? L.players.length : "—", "指名できる選手"]]);
+      } else {
+        $("heroEyebrow").textContent = "LEADER ・ 指名画面";
+        $("heroTitle").textContent = st ? "指名画面" : "読み込み中…";
+        $("heroSub").textContent = st ? st.msg || "" : "";
+        setFacts([]);
+      }
+      /* 受付の状態 */
+      let kind = "wait", title = "読み込み中…", text = "";
+      if (L.err) { kind = "bad"; title = "通信できませんでした"; text = L.err }
+      else if (st && !st.ok) { title = st.msg; text = "" }
+      else if (st && !r) { title = "受付開始をお待ちください"; text = "運営が指名の受付を始めると、ここに選手が表示されます。この画面は開いたままで大丈夫です。" }
+      else if (r && !r.mine) { title = r.label; text = "このチームは今回の指名はありません（メンバーがそろったか、指名が決まっています）。" }
+      else if (r && !r.open) { title = r.label + " ・ 受付終了"; text = "指名を締め切りました。発表をお待ちください。" }
+      else if (r) { kind = "open"; title = r.label + "を受付中"; text = st.nom ? "発表前なら、何度でも選び直せます。" : "下の一覧から選手を選んで「この選手を指名する」を押してください。" }
+      lvSet("lvStatus", `<div class="lv-status ${kind}"><span class="dot"></span><div><b>${esc(title)}</b>${text ? `<p>${esc(text)}</p>` : ""}</div></div>`);
+
+      /* いまの指名 */
+      const cur = st && st.ok && st.nom ? lvPlayer(st.nom) : null;
+      lvSet("lvMine", cur && r && r.mine ? `<section class="panel lv-mine">
+      <div class="panel-head"><h2>いまの指名</h2><span class="hint">${st.nomBy === "op" ? "運営が代わりに入力しました" : r.open ? "送信済み ・ 発表前なら変更できます" : "送信済み"}</span>
+        ${r.open ? `<button class="more sm" id="lvCancel" ${L.busy ? "disabled" : ""}>取り消す</button>` : ""}</div>
+      <div class="plist">${lvRowHTML(cur, 0, { cls: "cur", no: "指名" })}</div></section>` : "");
+
+      /* 選手一覧 */
+      const q = ($("lvQ") ? $("lvQ").value : "").trim().toLowerCase();
+      const list = L.players.filter(p => !q || (p.name + " " + p.weapons.join(" ")).toLowerCase().includes(q));
+      const can = lvCan();
+      $("lvListBox").hidden = !(r && r.mine);
+      $("lvQ").parentElement.hidden = L.players.length <= 6;
+      lvSet("lvList", list.length ? `<div class="plist ${can ? "pickable" : ""}" role="table" aria-label="指名できる選手">
+      <div class="prow phd" role="row"><span role="columnheader">No.</span><span role="columnheader">選手</span><span role="columnheader">使用武器</span><span role="columnheader">勝利ボーナス点</span><span role="columnheader">自己PR</span></div>
+      ${list.map((p, i) => lvRowHTML(p, L.players.indexOf(p), { click: can, cls: (p.id === L.sel ? "sel " : "") + (p.id === (st && st.nom) ? "cur" : ""), tag: p.id === (st && st.nom) ? "<small>指名中</small>" : "" })).join("")}
+    </div>` : `<p class="note">${L.players.length ? "該当する選手がいません。" : "選手がまだ表示されていません。"}</p>`);
+
+      /* チームのメンバー */
+      const ms = L.members;
+      lvSet("lvTeam", st && st.ok && ms.length ? `<div class="rteam lv-team" style="--tc:var(--lv-tc);--tf:var(--lv-tf)">
+      <div class="rteam-h"><b>${esc(st.team.name)}</b>${teamPts(ms)}</div>
+      <div class="rhead"><span></span><span>選手</span><span>使用武器</span><span>勝利ボーナス点</span></div>
+      ${ms.map((p, i) => `<div class="rrow">${avatar(p, "m")}<span class="rname"><b>${esc(p.name)}</b>${i === 0 ? '<span class="cap">C</span>' : ""}</span>
+        <span class="rweap">${weaponStack(p)}</span><span class="rpts">${ptsMini(p) || '<span class="wnone">—</span>'}</span></div>`).join("")}
+    </div>` : `<p class="note">${st && st.ok ? "受付が始まると、チームのメンバーが表示されます。" : ""}</p>`);
+      $("lvTeamBox").hidden = !(st && st.ok);
+
+      /* 下の指名バー */
+      const sp = L.sel ? lvPlayer(L.sel) : null, show = !!(sp && can && L.sel !== (st && st.nom));
+      $("lvBar").hidden = !show;
+      if (show) lvSet("lvBarIn", `${avatar(sp, "m")}<span class="nm"><small>この選手を指名しますか？</small>${esc(sp.name)}</span>
+      <button class="more" id="lvClear">やめる</button><button class="more primary" id="lvSend" ${L.busy ? "disabled" : ""}>この選手を指名する</button>`);
+      document.body.classList.toggle("lv-bar-on", show);
+      if ($("lvSend")) { $("lvSend").disabled = L.busy; $("lvSend").onclick = () => lvSend(L.sel) }
+      if ($("lvClear")) $("lvClear").onclick = () => { L.sel = null; lvRender() };
+      if ($("lvCancel")) $("lvCancel").onclick = () => lvSend("");
+    }
+    function leaderBoot() {
+      document.body.classList.add("leader");
+      document.title = ".inkドラフト甲子園 指名";
+      $("headActions").innerHTML = "";
+      $("app").innerHTML = `
+    <div id="lvStatus"></div>
+    <div id="lvMine"></div>
+    <section class="panel" id="lvTeamBox" hidden><div class="panel-head"><h2>チームのメンバー</h2></div><div id="lvTeam"></div></section>
+    <section class="panel" id="lvListBox" hidden>
+      <div class="panel-head"><h2>指名できる選手</h2><label class="lv-q"><input type="search" id="lvQ" placeholder="名前・武器で絞り込み" autocomplete="off" aria-label="名前・武器で絞り込み"></label></div>
+      <div id="lvList"></div>
+    </section>
+    <div class="lv-bar" id="lvBar" hidden><div class="wrap" id="lvBarIn"></div></div>
+    <div class="lv-toast" id="lvToast" role="status"></div>`;
+      $("lvQ").addEventListener("input", () => { L.memo.lvList = null; lvRender() });
+      $("lvList").addEventListener("click", e => {
+        const row = e.target.closest(".prow[data-id]"); if (!row || !lvCan()) return;
+        L.sel = L.sel === row.dataset.id ? null : row.dataset.id; L.memo.lvList = null; lvRender();
+      });
+      $("lvList").addEventListener("keydown", e => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        const row = e.target.closest(".prow[data-id]"); if (!row) return;
+        e.preventDefault(); row.click();
+      });
+      if (!API_URL) { L.st = { ok: false, msg: "このツールにスプレッドシートのURLが設定されていません。" }; lvRender(); return }
+      lvRender(); lvLoad();
+      setInterval(() => { if (!L.busy && !document.hidden) lvLoad() }, 4000);
+      document.addEventListener("visibilitychange", () => { if (!document.hidden) lvLoad() });
+    }
+
     function render() {
       stGen++;
       const stageView = S.view === "stage", matchView = S.view === "match";
@@ -4878,9 +5243,8 @@
       addEventListener("storage", e => { if (e.key === KEY) pull() });
       setInterval(pull, 300);
     }
-    render();
-    loadRoster();
-    rmStart();
+    if (LEADER) leaderBoot();
+    else { render(); loadRoster(); rmStart() }
   </script>
 
 
